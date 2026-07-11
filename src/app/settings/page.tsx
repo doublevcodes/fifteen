@@ -23,9 +23,8 @@ export default async function SettingsPage() {
           <p className="mt-2 text-sm leading-relaxed text-ink">
             When you report a delay, Fifteen automatically fetches TfL journey
             proof (if contactless) and submits the Delay Repay claim to the
-            operator on your behalf. We receive the operator payout, keep a 20%
-            fee (25% of that fee goes to charity), and pay the rest to your
-            connected bank.
+            operator on your behalf. We receive the operator payout, keep 20%,
+            donate 5% to charity, and pay 75% to your connected bank.
           </p>
         </div>
 

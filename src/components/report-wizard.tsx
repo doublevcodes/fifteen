@@ -345,9 +345,8 @@ export function ReportWizard() {
             <div className="space-y-3">
               <p className="text-sm text-ink-muted">
                 Rows highlighted in amber arrived 15+ minutes late at your
-                destination — Delay Repay eligible. You keep 80% of
-                compensation; Fifteen takes 20%, and 25% of that fee goes to
-                charity.
+                destination — Delay Repay eligible. You keep 75% of
+                compensation; Fifteen keeps 20%, and 5% goes to charity.
               </p>
               <div className="border border-bezel bg-bezel p-2.5 shadow-[var(--shadow)]">
                 <div className="overflow-hidden border border-line bg-paper">
@@ -397,8 +396,8 @@ export function ReportWizard() {
                                 {eligible ? (
                                   <span className="text-rail">
                                     {" "}
-                                    · +{delay} min DR15 · you 80% · fee 20%
-                                    (25%→charity)
+                                    · +{delay} min DR15 · you 75% · Fifteen 20%
+                                    · charity 5%
                                   </span>
                                 ) : null}
                               </span>

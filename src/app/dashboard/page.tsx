@@ -96,7 +96,7 @@ export default async function DashboardPage() {
                     {" · "}
                     {formatPounds(pendingPayoutPence)} pending
                     {pendingCount > 0 ? ` (${pendingCount})` : ""}
-                    . Your 80% share after Fifteen’s fee.
+                    . Your 75% share after Fifteen’s fee and charity.
                   </p>
                 </div>
                 <div className="text-right">
@@ -107,7 +107,7 @@ export default async function DashboardPage() {
                     {formatPounds(charityPence)}
                   </p>
                   <p className="mt-2 text-sm text-ink-muted">
-                    25% of Fifteen’s fee from these refunds.
+                    5% of Delay Repay from these refunds.
                   </p>
                 </div>
               </div>

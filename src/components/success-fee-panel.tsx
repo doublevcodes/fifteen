@@ -37,9 +37,8 @@ export function SuccessFeePanel({
         Your payout
       </h2>
       <p className="mt-2 text-sm text-ink-muted">
-        Fifteen receives Delay Repay from the operator, keeps a 20% fee (25% of
-        that fee goes to charity), and pays the rest to your connected bank
-        automatically.
+        Fifteen receives Delay Repay from the operator, keeps 20%, donates 5%
+        to charity, and pays 75% to your connected bank automatically.
       </p>
 
       <div className="mt-4">

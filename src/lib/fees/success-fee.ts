@@ -1,31 +1,35 @@
-/** Platform keeps 20% of Delay Repay; user receives 80%. */
-export const PLATFORM_FEE_RATE = 0.2;
-/** Of the platform fee, 25% is donated to charity (5% of compensation). */
-export const CHARITY_SHARE_OF_FEE = 0.25;
+/** Passenger receives 75% of Delay Repay. */
+export const USER_PAYOUT_RATE = 0.75;
+/** Fifteen keeps 20% of Delay Repay. */
+export const COMMISSION_RATE = 0.2;
+/** Charity receives 5% of Delay Repay. */
+export const CHARITY_RATE = 0.05;
+/** Total deducted from compensation (commission + charity). */
+export const PLATFORM_FEE_RATE = COMMISSION_RATE + CHARITY_RATE;
 
 export type PayoutSplit = {
   compensationAmountPence: number;
   /** Amount paid out to the passenger after fees. */
   userPayoutPence: number;
-  /** Total kept by Fifteen before charity split (20% of compensation). */
+  /** Total deducted (Fifteen commission + charity). */
   platformFeePence: number;
-  /** Fifteen's net (75% of platform fee). */
+  /** Fifteen's net keep (20% of compensation). */
   commissionPence: number;
-  /** Charity donation (25% of platform fee). */
+  /** Charity donation (5% of compensation). */
   charityPence: number;
 };
 
 /**
- * Split a Delay Repay amount Fifteen receives into user payout + fee + charity.
- * Charity is 25% of the platform fee (not of the full compensation).
+ * Split a Delay Repay amount into user payout (75%), Fifteen (20%), and charity (5%).
+ * User payout is the remainder so parts always sum to compensation.
  */
 export function calculatePayoutSplit(
   compensationAmountPence: number,
 ): PayoutSplit {
   const compensation = Math.max(0, Math.round(compensationAmountPence));
-  const platformFeePence = Math.round(compensation * PLATFORM_FEE_RATE);
-  const charityPence = Math.round(platformFeePence * CHARITY_SHARE_OF_FEE);
-  const commissionPence = platformFeePence - charityPence;
+  const commissionPence = Math.round(compensation * COMMISSION_RATE);
+  const charityPence = Math.round(compensation * CHARITY_RATE);
+  const platformFeePence = commissionPence + charityPence;
   const userPayoutPence = compensation - platformFeePence;
   return {
     compensationAmountPence: compensation,
@@ -46,9 +50,6 @@ export function calculateSuccessFee(compensationAmountPence: number) {
     totalFeePence: split.platformFeePence,
   };
 }
-
-export const COMMISSION_RATE = PLATFORM_FEE_RATE * (1 - CHARITY_SHARE_OF_FEE);
-export const CHARITY_RATE = PLATFORM_FEE_RATE * CHARITY_SHARE_OF_FEE;
 
 /** Mollie amount string: pence → "X.XX" */
 export function penceToMollieAmount(pence: number): string {

@@ -184,7 +184,7 @@ export function SettingsForm() {
           Payout bank (Mollie)
         </h2>
         <p className="text-sm text-ink-muted">
-          Connect the UK bank account where Fifteen should send your 80% share
+          Connect the UK bank account where Fifteen should send your 75% share
           after we receive Delay Repay.
         </p>
         {profile.mollieCustomerId ? (
