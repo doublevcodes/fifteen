@@ -38,16 +38,6 @@ export async function POST(_req: Request, { params }: Params) {
     );
   }
 
-  const profile = await prisma.claimProfile.findUnique({
-    where: { userId: user.id },
-  });
-  if (!profile?.autoSubmitConsent) {
-    return NextResponse.json(
-      { error: "Enable auto-submit consent in settings first." },
-      { status: 400 },
-    );
-  }
-
   await prisma.delayEvent.update({
     where: { id },
     data: { status: "detected", submitError: null },

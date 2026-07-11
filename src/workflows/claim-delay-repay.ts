@@ -38,20 +38,8 @@ async function loadContext(input: ClaimWorkflowInput) {
     throw new Error("No delay event to process");
   }
 
-  if (!user.claimProfile?.autoSubmitConsent) {
-    await prisma.delayEvent.update({
-      where: { id: event.id },
-      data: {
-        status: "needs_attention",
-        submitError: "Auto-submit consent not enabled in settings.",
-      },
-    });
-    return { abort: true as const, eventId: event.id, reason: "no_consent" };
-  }
-
   console.log(`[claim workflow] loaded event=${event.id} status=${event.status}`);
   return {
-    abort: false as const,
     eventId: event.id,
     userId: user.id,
     userEmail: user.email,
@@ -390,9 +378,6 @@ export async function claimDelayRepayWorkflow(input: ClaimWorkflowInput) {
   const meta = getWorkflowMetadata();
 
   const ctx = await loadContext(input);
-  if (ctx.abort) {
-    return { status: "needs_attention" as const, reason: ctx.reason, eventId: ctx.eventId };
-  }
 
   await recordWorkflowRun(ctx.eventId, meta.workflowRunId);
 

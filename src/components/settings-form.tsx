@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { OPERATOR_LABELS, type Operator } from "@/lib/eligibility/dr15";
 
 type Profile = {
-  autoSubmitConsent: boolean;
   bankAccountName: string | null;
   bankSortCode: string | null;
   bankAccountNumberLast4: string | null;
@@ -22,7 +21,6 @@ export function SettingsForm() {
   const [connectingBank, setConnectingBank] = useState(false);
 
   const [profile, setProfile] = useState<Profile>({
-    autoSubmitConsent: false,
     bankAccountName: "",
     bankSortCode: "",
     bankAccountNumberLast4: null,
@@ -60,7 +58,6 @@ export function SettingsForm() {
           "",
         );
         setProfile({
-          autoSubmitConsent: Boolean(data.profile.autoSubmitConsent),
           bankAccountName: data.profile.bankAccountName ?? "",
           bankSortCode: sortDigits || null,
           bankAccountNumberLast4: data.profile.bankAccountNumberLast4 ?? null,
@@ -85,29 +82,6 @@ export function SettingsForm() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function saveConsent(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          autoSubmitConsent: profile.autoSubmitConsent,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setMessage("Automation preference saved.");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function connectBank(e: React.FormEvent) {
     e.preventDefault();
@@ -201,41 +175,6 @@ export function SettingsForm() {
           {error ?? message}
         </p>
       )}
-
-      <form
-        onSubmit={saveConsent}
-        className="space-y-4 border border-line bg-[var(--card)] p-6"
-      >
-        <h2 className="display text-xl font-bold uppercase tracking-wide">
-          Auto Delay Repay
-        </h2>
-        <label className="flex items-start gap-3 text-sm">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={profile.autoSubmitConsent}
-            onChange={(e) =>
-              setProfile((p) => ({
-                ...p,
-                autoSubmitConsent: e.target.checked,
-              }))
-            }
-          />
-          <span>
-            When I report a delay, automatically fetch TfL journey proof (if
-            contactless) and submit the Delay Repay claim to the operator on my
-            behalf. Fifteen receives the operator payout, keeps a 20% fee (25% of
-            that fee goes to charity), and pays the rest to my connected bank.
-          </span>
-        </label>
-        <button
-          type="submit"
-          disabled={saving}
-          className="board-btn board-btn-primary mono text-xs uppercase tracking-[0.14em]"
-        >
-          Save preference
-        </button>
-      </form>
 
       <form
         onSubmit={connectBank}

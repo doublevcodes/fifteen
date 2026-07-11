@@ -10,15 +10,25 @@ export default async function SettingsPage() {
       <SiteHeader />
       <main className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">
         <p className="mono text-[9px] uppercase tracking-[0.22em] text-ink-muted">
-          Settings · Automation
+          Settings · Connections
         </p>
         <h1 className="display mt-1 text-3xl font-bold uppercase tracking-[0.1em] text-ink sm:text-4xl">
-          Auto Delay Repay
+          Settings
         </h1>
-        <p className="mt-3 max-w-xl text-sm text-ink-muted">
-          Connect your payout bank, save TOC / TfL portal logins, and turn on
-          auto-submit when you report a delay.
-        </p>
+
+        <div className="mt-6 border border-line bg-[var(--card)] p-5 sm:p-6">
+          <p className="mono text-[9px] uppercase tracking-[0.2em] text-ink-muted">
+            Auto Delay Repay
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-ink">
+            When you report a delay, Fifteen automatically fetches TfL journey
+            proof (if contactless) and submits the Delay Repay claim to the
+            operator on your behalf. We receive the operator payout, keep a 20%
+            fee (25% of that fee goes to charity), and pay the rest to your
+            connected bank.
+          </p>
+        </div>
+
         <div className="mt-8">
           <SettingsForm />
         </div>

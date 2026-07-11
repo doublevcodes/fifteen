@@ -24,7 +24,6 @@ const profileSchema = z.object({
       "season_annual",
     ])
     .optional(),
-  autoSubmitConsent: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -92,7 +91,7 @@ export async function PUT(req: Request) {
       phone: data.phone ?? null,
       payoutPreference: data.payoutPreference ?? "bank",
       defaultTicketType: data.defaultTicketType ?? "contactless",
-      autoSubmitConsent: data.autoSubmitConsent ?? false,
+      autoSubmitConsent: true,
     },
     update: {
       ...(data.legalName !== undefined ? { legalName: data.legalName } : {}),
@@ -110,9 +109,6 @@ export async function PUT(req: Request) {
         : {}),
       ...(data.defaultTicketType !== undefined
         ? { defaultTicketType: data.defaultTicketType }
-        : {}),
-      ...(data.autoSubmitConsent !== undefined
-        ? { autoSubmitConsent: data.autoSubmitConsent }
         : {}),
     },
   });

@@ -142,21 +142,6 @@ export async function POST(req: Request) {
       ].join("\n");
     }
 
-    const profile = await prisma.claimProfile.findUnique({
-      where: { userId: user.id },
-    });
-    const autoSubmit = Boolean(profile?.autoSubmitConsent);
-
-    if (isContactless && !autoSubmit) {
-      return NextResponse.json(
-        {
-          error:
-            "Contactless claims need auto-submit enabled (and a TfL login) so Fifteen can read the journey charge from your TfL proof. Turn this on in Settings, or choose a different ticket type.",
-        },
-        { status: 400 },
-      );
-    }
-
     const event = await prisma.delayEvent.create({
       data: {
         userId: user.id,
@@ -175,30 +160,26 @@ export async function POST(req: Request) {
         compensationTier,
         compensationAmountPence,
         claimSummary,
-        status: autoSubmit ? "detected" : "unclaimed",
+        status: "detected",
       },
     });
 
-    let workflowRunId: string | null = null;
-    if (autoSubmit) {
-      const run = await start(claimDelayRepayWorkflow, [
-        { userId: user.id, delayEventId: event.id },
-      ]);
-      workflowRunId = run.runId;
-      await prisma.delayEvent.update({
-        where: { id: event.id },
-        data: { workflowRunId },
-      });
-    }
+    const run = await start(claimDelayRepayWorkflow, [
+      { userId: user.id, delayEventId: event.id },
+    ]);
+    const workflowRunId = run.runId;
+    await prisma.delayEvent.update({
+      where: { id: event.id },
+      data: { workflowRunId },
+    });
 
     return NextResponse.json(
       {
         event: {
           ...event,
           workflowRunId,
-          status: autoSubmit ? "detected" : event.status,
+          status: "detected",
         },
-        autoSubmit,
       },
       { status: 201 },
     );

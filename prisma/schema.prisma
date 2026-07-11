@@ -32,7 +32,7 @@ model ClaimProfile {
   phone                   String?
   payoutPreference        String   @default("bank") // bank | paypal | voucher — TOC still pays Fifteen
   defaultTicketType       String   @default("contactless")
-  autoSubmitConsent       Boolean  @default(false)
+  autoSubmitConsent       Boolean  @default(true)
   /// Passenger bank for Fifteen → user Mollie payout
   bankAccountName         String?
   bankSortCode            String?
