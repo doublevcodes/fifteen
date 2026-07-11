@@ -1,8 +1,7 @@
-import { mkdir, writeFile, readFile } from "node:fs/promises";
-import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
-const EVIDENCE_ROOT = path.join(process.cwd(), "data", "evidence");
+export const EVIDENCE_BUCKET = "claim-evidence";
 
 export async function saveEvidenceFile(input: {
   userId: string;
@@ -18,13 +17,21 @@ export async function saveEvidenceFile(input: {
       : input.mimeType.includes("csv")
         ? "csv"
         : "bin");
-  const dir = path.join(EVIDENCE_ROOT, input.userId);
-  await mkdir(dir, { recursive: true });
-  const filename = `${input.delayEventId}-${randomUUID()}.${ext}`;
-  const absolute = path.join(dir, filename);
-  await writeFile(absolute, input.bytes);
+  const relativePath = `${input.userId}/${input.delayEventId}-${randomUUID()}.${ext}`;
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase.storage
+    .from(EVIDENCE_BUCKET)
+    .upload(relativePath, input.bytes, {
+      contentType: input.mimeType,
+      upsert: false,
+    });
+
+  if (error) {
+    throw new Error(`Failed to upload evidence: ${error.message}`);
+  }
+
   return {
-    relativePath: path.join(input.userId, filename),
+    relativePath,
     mimeType: input.mimeType,
   };
 }
@@ -32,11 +39,26 @@ export async function saveEvidenceFile(input: {
 export async function readEvidenceFile(
   relativePath: string,
 ): Promise<Buffer> {
-  const absolute = path.join(EVIDENCE_ROOT, relativePath);
-  // Prevent path traversal
-  const resolved = path.resolve(absolute);
-  if (!resolved.startsWith(path.resolve(EVIDENCE_ROOT))) {
+  // Prevent path traversal / absolute paths
+  if (
+    !relativePath ||
+    relativePath.includes("..") ||
+    relativePath.startsWith("/")
+  ) {
     throw new Error("Invalid evidence path");
   }
-  return readFile(resolved);
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.storage
+    .from(EVIDENCE_BUCKET)
+    .download(relativePath);
+
+  if (error || !data) {
+    throw new Error(
+      `Failed to download evidence: ${error?.message ?? "not found"}`,
+    );
+  }
+
+  const ab = await data.arrayBuffer();
+  return Buffer.from(ab);
 }

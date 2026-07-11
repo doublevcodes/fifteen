@@ -77,5 +77,12 @@ export interface TflProofFetcher {
 
 export function claimSubmitMode(): "mock" | "live" {
   const mode = process.env.CLAIM_SUBMIT_MODE?.trim().toLowerCase();
+  // Playwright/Chromium is not available on Vercel Functions.
+  if (mode === "live" && process.env.VERCEL === "1") {
+    console.warn(
+      "CLAIM_SUBMIT_MODE=live is not supported on Vercel; using mock",
+    );
+    return "mock";
+  }
   return mode === "live" ? "live" : "mock";
 }

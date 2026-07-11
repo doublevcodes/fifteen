@@ -5,7 +5,12 @@ const ALGO = "aes-256-gcm";
 function getKey(): Buffer {
   const secret = process.env.CREDENTIALS_ENCRYPTION_KEY?.trim();
   if (!secret) {
-    // Dev fallback so local demos work without extra setup; replace in production.
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "CREDENTIALS_ENCRYPTION_KEY is required in production",
+      );
+    }
+    // Dev fallback so local demos work without extra setup.
     return scryptSync("fifteen-dev-credentials-key", "fifteen-salt", 32);
   }
   if (/^[0-9a-fA-F]{64}$/.test(secret)) {
