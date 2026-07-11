@@ -7,10 +7,15 @@ const isPublicRoute = createRouteMatcher([
   "/.well-known/workflow/(.*)",
 ]);
 
+const isApiRoute = createRouteMatcher(["/api(.*)"]);
+
 export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+  if (isPublicRoute(req) || isApiRoute(req)) {
+    // API routes authenticate themselves and must return JSON 401 —
+    // auth.protect() redirects / 404s with HTML, which breaks fetch().json().
+    return;
   }
+  await auth.protect();
 });
 
 export const config = {

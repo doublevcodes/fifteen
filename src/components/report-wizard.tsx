@@ -181,8 +181,19 @@ export function ReportWizard() {
           ticketPricePence,
         }),
       });
-      const data = await res.json();
+      const raw = await res.text();
+      let data: { error?: string; event?: { id: string } } = {};
+      try {
+        data = raw ? (JSON.parse(raw) as typeof data) : {};
+      } catch {
+        throw new Error(
+          res.status === 401 || res.status === 404
+            ? "Session expired — sign in again and retry."
+            : `Could not save claim (HTTP ${res.status}).`,
+        );
+      }
       if (!res.ok) throw new Error(data.error ?? "Could not save claim");
+      if (!data.event?.id) throw new Error("Claim saved but no id returned");
       router.push(`/claims/${data.event.id}`);
     } catch (err) {
       setStep("ticket");
