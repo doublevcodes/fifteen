@@ -13,7 +13,7 @@ export class MockDelayRepayPortal implements DelayRepayPortal {
   async submit(input: PortalClaimInput): Promise<PortalSubmitResult> {
     const ref = `MOCK-${input.operator}-${input.journey.runDate.replace(/-/g, "")}-${input.journey.serviceUid.slice(0, 6).toUpperCase()}`;
     console.log(
-      `[mock portal] submitted ${input.operator} claim ${ref} delay=${input.journey.delayMinutes}m fare=${input.ticketPricePence} evidence=${Boolean(input.evidenceFile)}`,
+      `[mock portal] submitted ${input.operator} claim ${ref} delay=${input.journey.delayMinutes}m fare=${input.ticketPricePence} evidence=${Boolean(input.evidenceFile)} payoutDestination=Fifteen (receives DR then pays passenger)`,
     );
     return { ok: true, claimRef: ref };
   }

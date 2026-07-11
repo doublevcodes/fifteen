@@ -48,7 +48,15 @@ export async function GET() {
   ]);
 
   return NextResponse.json({
-    profile,
+    profile: profile
+      ? {
+          ...profile,
+          bankAccountNumber: undefined,
+          bankAccountNumberLast4: profile.bankAccountNumber
+            ? profile.bankAccountNumber.slice(-4)
+            : null,
+        }
+      : null,
     operatorCredentials,
     tflCredential,
   });

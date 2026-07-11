@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireDbUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { ensureSuccessFeeForEvent } from "@/lib/mollie/create-success-fee-payment";
 
 const patchSchema = z.object({
   status: z.enum([
@@ -30,6 +31,7 @@ export async function GET(_req: Request, { params }: Params) {
   const { id } = await params;
   const event = await prisma.delayEvent.findFirst({
     where: { id, userId: user.id },
+    include: { successFee: true },
   });
 
   if (!event) {
@@ -61,10 +63,27 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const becomingSubmitted =
+    parsed.data.status === "submitted" && existing.status !== "submitted";
+
   const event = await prisma.delayEvent.update({
     where: { id },
-    data: { status: parsed.data.status },
+    data: {
+      status: parsed.data.status,
+      ...(becomingSubmitted && !existing.submittedAt
+        ? { submittedAt: new Date() }
+        : {}),
+    },
+    include: { successFee: true },
   });
 
-  return NextResponse.json({ event });
+  let successFee = event.successFee;
+  if (becomingSubmitted) {
+    await ensureSuccessFeeForEvent(id, { swallowErrors: true });
+    successFee = await prisma.successFee.findUnique({
+      where: { delayEventId: id },
+    });
+  }
+
+  return NextResponse.json({ event: { ...event, successFee } });
 }

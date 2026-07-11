@@ -71,6 +71,9 @@ Without RTT credentials, the report wizard uses **demo mock services** (27-minut
 | `RTT_USERNAME` / `RTT_PASSWORD` | Legacy `api.rtt.io` Basic Auth (deprecated Sep 2026) |
 | `CLAIM_SUBMIT_MODE` | `mock` (default; use on Vercel) or `live` Playwright (local only) |
 | `CREDENTIALS_ENCRYPTION_KEY` | Encrypts stored TOC/TfL passwords (required in production) |
+| `MOLLIE_API_KEY` | Mollie API key for 20% success fee checkout |
+| `MOLLIE_CHARITY_ORG_ID` | Connected Mollie org receiving the 5% charity split |
+| `NEXT_PUBLIC_APP_URL` | Public base URL for Mollie redirect + webhook |
 
 ### Deploy to Vercel
 

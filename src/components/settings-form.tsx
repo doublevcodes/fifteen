@@ -1,23 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  OPERATOR_LABELS,
-  TICKET_TYPE_LABELS,
-  type Operator,
-  type TicketType,
-} from "@/lib/eligibility/dr15";
+import { OPERATOR_LABELS, type Operator } from "@/lib/eligibility/dr15";
 
 type Profile = {
-  legalName: string | null;
-  addressLine1: string | null;
-  addressLine2: string | null;
-  city: string | null;
-  postcode: string | null;
-  phone: string | null;
-  payoutPreference: string;
-  defaultTicketType: string;
   autoSubmitConsent: boolean;
+  bankAccountName: string | null;
+  bankSortCode: string | null;
+  bankAccountNumberLast4: string | null;
+  mollieCustomerId: string | null;
+  bankConnectedAt: string | null;
 };
 
 const OPERATORS = Object.keys(OPERATOR_LABELS) as Operator[];
@@ -27,17 +19,21 @@ export function SettingsForm() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connectingBank, setConnectingBank] = useState(false);
 
   const [profile, setProfile] = useState<Profile>({
-    legalName: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    postcode: "",
-    phone: "",
-    payoutPreference: "bank",
-    defaultTicketType: "contactless",
     autoSubmitConsent: false,
+    bankAccountName: "",
+    bankSortCode: "",
+    bankAccountNumberLast4: null,
+    mollieCustomerId: null,
+    bankConnectedAt: null,
+  });
+
+  const [bankForm, setBankForm] = useState({
+    bankAccountName: "",
+    bankSortCode: "",
+    bankAccountNumber: "",
   });
 
   const [operatorCreds, setOperatorCreds] = useState<
@@ -59,16 +55,22 @@ export function SettingsForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to load");
       if (data.profile) {
+        const sortDigits = String(data.profile.bankSortCode ?? "").replace(
+          /\D/g,
+          "",
+        );
         setProfile({
-          legalName: data.profile.legalName ?? "",
-          addressLine1: data.profile.addressLine1 ?? "",
-          addressLine2: data.profile.addressLine2 ?? "",
-          city: data.profile.city ?? "",
-          postcode: data.profile.postcode ?? "",
-          phone: data.profile.phone ?? "",
-          payoutPreference: data.profile.payoutPreference ?? "bank",
-          defaultTicketType: data.profile.defaultTicketType ?? "contactless",
           autoSubmitConsent: Boolean(data.profile.autoSubmitConsent),
+          bankAccountName: data.profile.bankAccountName ?? "",
+          bankSortCode: sortDigits || null,
+          bankAccountNumberLast4: data.profile.bankAccountNumberLast4 ?? null,
+          mollieCustomerId: data.profile.mollieCustomerId ?? null,
+          bankConnectedAt: data.profile.bankConnectedAt ?? null,
+        });
+        setBankForm({
+          bankAccountName: data.profile.bankAccountName ?? "",
+          bankSortCode: sortDigits,
+          bankAccountNumber: "",
         });
       }
       setOperatorCreds(data.operatorCredentials ?? []);
@@ -84,7 +86,7 @@ export function SettingsForm() {
     void load();
   }, [load]);
 
-  async function saveProfile(e: React.FormEvent) {
+  async function saveConsent(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
@@ -94,18 +96,12 @@ export function SettingsForm() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...profile,
-          legalName: profile.legalName || null,
-          addressLine1: profile.addressLine1 || null,
-          addressLine2: profile.addressLine2 || null,
-          city: profile.city || null,
-          postcode: profile.postcode || null,
-          phone: profile.phone || null,
+          autoSubmitConsent: profile.autoSubmitConsent,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
-      setMessage("Profile saved.");
+      setMessage("Automation preference saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
     } finally {
@@ -113,10 +109,43 @@ export function SettingsForm() {
     }
   }
 
+  async function connectBank(e: React.FormEvent) {
+    e.preventDefault();
+    setConnectingBank(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const payload = {
+        bankAccountName: bankForm.bankAccountName.trim(),
+        bankSortCode: bankForm.bankSortCode.replace(/\D/g, ""),
+        bankAccountNumber: bankForm.bankAccountNumber.replace(/\D/g, ""),
+      };
+      const res = await fetch("/api/mollie/bank-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Bank connect failed");
+      setMessage(
+        data.paidOutCount > 0
+          ? `Bank connected via Mollie. Paid out ${data.paidOutCount} pending claim${data.paidOutCount === 1 ? "" : "s"}.`
+          : "Bank connected via Mollie.",
+      );
+      setBankForm((f) => ({ ...f, bankAccountNumber: "" }));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bank connect failed");
+    } finally {
+      setConnectingBank(false);
+    }
+  }
+
   async function saveOperatorCred(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
@@ -139,6 +168,7 @@ export function SettingsForm() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
       const res = await fetch("/api/settings", {
         method: "POST",
@@ -173,11 +203,11 @@ export function SettingsForm() {
       )}
 
       <form
-        onSubmit={saveProfile}
+        onSubmit={saveConsent}
         className="space-y-4 border border-line bg-[var(--card)] p-6"
       >
         <h2 className="display text-xl font-bold uppercase tracking-wide">
-          Claim profile
+          Auto Delay Repay
         </h2>
         <label className="flex items-start gap-3 text-sm">
           <input
@@ -194,80 +224,93 @@ export function SettingsForm() {
           <span>
             When I report a delay, automatically fetch TfL journey proof (if
             contactless) and submit the Delay Repay claim to the operator on my
-            behalf.
+            behalf. Fifteen receives the operator payout, keeps a 20% fee (25% of
+            that fee goes to charity), and pays the rest to my connected bank.
           </span>
         </label>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field
-            label="Legal name"
-            value={profile.legalName ?? ""}
-            onChange={(v) => setProfile((p) => ({ ...p, legalName: v }))}
-          />
-          <Field
-            label="Phone"
-            value={profile.phone ?? ""}
-            onChange={(v) => setProfile((p) => ({ ...p, phone: v }))}
-          />
-          <Field
-            label="Address"
-            value={profile.addressLine1 ?? ""}
-            onChange={(v) => setProfile((p) => ({ ...p, addressLine1: v }))}
-          />
-          <Field
-            label="City"
-            value={profile.city ?? ""}
-            onChange={(v) => setProfile((p) => ({ ...p, city: v }))}
-          />
-          <Field
-            label="Postcode"
-            value={profile.postcode ?? ""}
-            onChange={(v) => setProfile((p) => ({ ...p, postcode: v }))}
-          />
-          <label className="block text-sm">
-            <span className="mono mb-1 block text-[10px] uppercase tracking-[0.16em] text-ink-muted">
-              Payout preference
-            </span>
-            <select
-              className="board-input"
-              value={profile.payoutPreference}
-              onChange={(e) =>
-                setProfile((p) => ({ ...p, payoutPreference: e.target.value }))
-              }
-            >
-              <option value="bank">Bank transfer</option>
-              <option value="paypal">PayPal</option>
-              <option value="voucher">Voucher</option>
-            </select>
-          </label>
-          <label className="block text-sm">
-            <span className="mono mb-1 block text-[10px] uppercase tracking-[0.16em] text-ink-muted">
-              Default ticket type
-            </span>
-            <select
-              className="board-input"
-              value={profile.defaultTicketType}
-              onChange={(e) =>
-                setProfile((p) => ({
-                  ...p,
-                  defaultTicketType: e.target.value,
-                }))
-              }
-            >
-              {(Object.keys(TICKET_TYPE_LABELS) as TicketType[]).map((k) => (
-                <option key={k} value={k}>
-                  {TICKET_TYPE_LABELS[k]}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
         <button
           type="submit"
           disabled={saving}
           className="board-btn board-btn-primary mono text-xs uppercase tracking-[0.14em]"
         >
-          Save profile
+          Save preference
+        </button>
+      </form>
+
+      <form
+        onSubmit={connectBank}
+        className="space-y-4 border border-line bg-[var(--card)] p-6"
+      >
+        <h2 className="display text-xl font-bold uppercase tracking-wide">
+          Payout bank (Mollie)
+        </h2>
+        <p className="text-sm text-ink-muted">
+          Connect the UK bank account where Fifteen should send your 80% share
+          after we receive Delay Repay.
+        </p>
+        {profile.mollieCustomerId ? (
+          <p className="mono text-xs text-signal">
+            Connected
+            {profile.bankAccountNumberLast4
+              ? ` · ****${profile.bankAccountNumberLast4}`
+              : ""}
+            {profile.bankConnectedAt
+              ? ` · ${new Date(profile.bankConnectedAt).toLocaleDateString("en-GB")}`
+              : ""}
+          </p>
+        ) : null}
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field
+            label="Account name"
+            value={bankForm.bankAccountName}
+            onChange={(v) =>
+              setBankForm((f) => ({ ...f, bankAccountName: v }))
+            }
+            required
+            autoComplete="name"
+          />
+          <Field
+            label="Sort code (6 digits)"
+            value={bankForm.bankSortCode}
+            onChange={(v) =>
+              setBankForm((f) => ({
+                ...f,
+                bankSortCode: v.replace(/\D/g, "").slice(0, 6),
+              }))
+            }
+            inputMode="numeric"
+            required
+            autoComplete="off"
+          />
+          <Field
+            label="Account number (8 digits)"
+            value={bankForm.bankAccountNumber}
+            onChange={(v) =>
+              setBankForm((f) => ({
+                ...f,
+                bankAccountNumber: v.replace(/\D/g, "").slice(0, 8),
+              }))
+            }
+            inputMode="numeric"
+            required
+            autoComplete="off"
+            placeholder={
+              profile.bankAccountNumberLast4
+                ? `••••${profile.bankAccountNumberLast4}`
+                : undefined
+            }
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={connectingBank}
+          className="board-btn board-btn-primary mono text-xs uppercase tracking-[0.14em] disabled:opacity-60"
+        >
+          {connectingBank
+            ? "Connecting…"
+            : profile.mollieCustomerId
+              ? "Update bank via Mollie"
+              : "Connect bank via Mollie"}
         </button>
       </form>
 
@@ -376,11 +419,19 @@ function Field({
   value,
   onChange,
   type = "text",
+  required,
+  inputMode,
+  autoComplete,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  required?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  autoComplete?: string;
+  placeholder?: string;
 }) {
   return (
     <label className="block text-sm">
@@ -392,6 +443,10 @@ function Field({
         className="board-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        required={required}
+        inputMode={inputMode}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
       />
     </label>
   );

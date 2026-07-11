@@ -16,8 +16,8 @@ export default async function SettingsPage() {
           Auto Delay Repay
         </h1>
         <p className="mt-3 max-w-xl text-sm text-ink-muted">
-          Save your claim details and TOC / TfL logins. When you report a delay,
-          Fifteen can fetch contactless proof and submit the claim for you.
+          Connect your payout bank, save TOC / TfL portal logins, and turn on
+          auto-submit when you report a delay.
         </p>
         <div className="mt-8">
           <SettingsForm />

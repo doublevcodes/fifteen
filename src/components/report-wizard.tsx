@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PayoutBreakdown } from "@/components/payout-breakdown";
 import { StationAutocomplete } from "@/components/station-autocomplete";
+import { calculatePayoutSplit } from "@/lib/fees/success-fee";
 import {
   TICKET_TYPE_LABELS,
+  calculateCompensation,
   formatPounds,
   type TicketType,
 } from "@/lib/eligibility/dr15";
@@ -48,7 +51,18 @@ type ServiceDetail = {
 type Step = "search" | "pick" | "ticket" | "saving";
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: "Europe/London",
+  });
+}
+
+function nowTime(): string {
+  return new Date().toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/London",
+  });
 }
 
 function formatClock(iso: string | null): string {
@@ -67,10 +81,10 @@ function formatClock(iso: string | null): string {
 export function ReportWizard() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("search");
-  const [station, setStation] = useState("SUR");
-  const [to, setTo] = useState("WAT");
-  const [date, setDate] = useState(todayIso());
-  const [time, setTime] = useState("08:00");
+  const [station, setStation] = useState("");
+  const [to, setTo] = useState("");
+  const [date, setDate] = useState(todayIso);
+  const [time, setTime] = useState(nowTime);
   const [services, setServices] = useState<ServiceSummary[]>([]);
   const [selected, setSelected] = useState<ServiceSummary | null>(null);
   const [detail, setDetail] = useState<ServiceDetail | null>(null);
@@ -86,6 +100,20 @@ export function ReportWizard() {
     if (Number.isNaN(n) || n <= 0) return 0;
     return Math.round(n * 100);
   }, [ticketPounds, ticketType]);
+
+  const payoutPreview = useMemo(() => {
+    if (!detail || detail.delayMinutes < 15) return null;
+    if (ticketType === "contactless" || ticketPricePence <= 0) return null;
+    if (!detail.operator) return null;
+    const comp = calculateCompensation({
+      operator: detail.operator,
+      delayMinutes: detail.delayMinutes,
+      ticketPricePence,
+      ticketType,
+    });
+    if (!comp.eligible) return null;
+    return calculatePayoutSplit(comp.compensationAmountPence);
+  }, [detail, ticketPricePence, ticketType]);
 
   async function runSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -317,7 +345,9 @@ export function ReportWizard() {
             <div className="space-y-3">
               <p className="text-sm text-ink-muted">
                 Rows highlighted in amber arrived 15+ minutes late at your
-                destination — Delay Repay eligible.
+                destination — Delay Repay eligible. You keep 80% of
+                compensation; Fifteen takes 20%, and 25% of that fee goes to
+                charity.
               </p>
               <div className="border border-bezel bg-bezel p-2.5 shadow-[var(--shadow)]">
                 <div className="overflow-hidden border border-line bg-paper">
@@ -367,7 +397,8 @@ export function ReportWizard() {
                                 {eligible ? (
                                   <span className="text-rail">
                                     {" "}
-                                    · +{delay} min DR15
+                                    · +{delay} min DR15 · you 80% · fee 20%
+                                    (25%→charity)
                                   </span>
                                 ) : null}
                               </span>
@@ -491,6 +522,12 @@ export function ReportWizard() {
               )}
             </>
           )}
+
+          {payoutPreview ? (
+            <PayoutBreakdown split={payoutPreview} />
+          ) : ticketType === "contactless" ? (
+            <PayoutBreakdown split={null} />
+          ) : null}
 
           <div className="flex flex-wrap gap-3">
             <button

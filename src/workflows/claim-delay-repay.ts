@@ -11,6 +11,7 @@ import {
 import { getDelayRepayPortal, getTflProofFetcher } from "@/lib/portals";
 import { parseTflFareFromProofBytes } from "@/lib/portals/tfl-fare";
 import { getServiceDelay } from "@/lib/rtt/client";
+import { ensureSuccessFeeForEvent } from "@/lib/mollie/create-success-fee-payment";
 
 export type ClaimWorkflowInput = {
   userId: string;
@@ -373,6 +374,16 @@ async function recordWorkflowRun(eventId: string, runId: string) {
   });
 }
 
+/** Open settlement row after portal submit (Fifteen receives DR → pays user). */
+async function createSuccessFeeStep(eventId: string) {
+  "use step";
+  const result = await ensureSuccessFeeForEvent(eventId, { swallowErrors: true });
+  console.log(
+    `[claim workflow] settlement event=${eventId} status=${result?.status ?? "skipped"} payout=${result?.userPayoutPence ?? 0}`,
+  );
+  return result;
+}
+
 export async function claimDelayRepayWorkflow(input: ClaimWorkflowInput) {
   "use workflow";
 
@@ -418,6 +429,8 @@ export async function claimDelayRepayWorkflow(input: ClaimWorkflowInput) {
   if (!submitted.ok) {
     return { status: "needs_attention" as const, eventId: ctx.eventId };
   }
+
+  await createSuccessFeeStep(ctx.eventId);
 
   return {
     status: "submitted" as const,

@@ -17,6 +17,7 @@ model User {
   claimProfile        ClaimProfile?
   operatorCredentials OperatorCredential[]
   tflCredential       TflCredential?
+  successFees         SuccessFee[]
 }
 
 model ClaimProfile {
@@ -29,9 +30,15 @@ model ClaimProfile {
   city                    String?
   postcode                String?
   phone                   String?
-  payoutPreference        String   @default("bank") // bank | paypal | voucher
+  payoutPreference        String   @default("bank") // bank | paypal | voucher — TOC still pays Fifteen
   defaultTicketType       String   @default("contactless")
   autoSubmitConsent       Boolean  @default(false)
+  /// Passenger bank for Fifteen → user Mollie payout
+  bankAccountName         String?
+  bankSortCode            String?
+  bankAccountNumber       String?
+  mollieCustomerId        String?
+  bankConnectedAt         DateTime?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 }
@@ -90,8 +97,33 @@ model DelayEvent {
   contactlessFarePence    Int?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
+  successFee              SuccessFee?
 
   @@index([userId, status])
   @@index([userId, createdAt])
   @@unique([userId, serviceUid, runDate])
+}
+
+/// Settlement when Fifteen receives Delay Repay and pays the passenger (minus fee).
+model SuccessFee {
+  id                       String     @id @default(cuid())
+  delayEventId             String     @unique
+  delayEvent               DelayEvent @relation(fields: [delayEventId], references: [id], onDelete: Cascade)
+  userId                   String
+  user                     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  compensationAmountPence  Int
+  userPayoutPence          Int        @default(0)
+  commissionPence          Int
+  charityPence             Int
+  totalFeePence            Int
+  /// awaiting_funds | ready | paid_out | failed
+  status                   String     @default("awaiting_funds")
+  molliePaymentId          String?    @unique
+  checkoutUrl              String?
+  paidAt                   DateTime?
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+
+  @@index([userId, status])
+  @@index([molliePaymentId])
 }
