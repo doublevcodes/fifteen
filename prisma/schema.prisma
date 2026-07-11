@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  clerkId             String               @unique
+  email               String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  delayEvents         DelayEvent[]
+  claimProfile        ClaimProfile?
+  operatorCredentials OperatorCredential[]
+  tflCredential       TflCredential?
+}
+
+model ClaimProfile {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  legalName               String?
+  addressLine1            String?
+  addressLine2            String?
+  city                    String?
+  postcode                String?
+  phone                   String?
+  payoutPreference        String   @default("bank") // bank | paypal | voucher
+  defaultTicketType       String   @default("contactless")
+  autoSubmitConsent       Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model OperatorCredential {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operator           String
+  portalEmail        String
+  passwordCiphertext String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([userId, operator])
+  @@index([userId])
+}
+
+model TflCredential {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  portalEmail        String
+  passwordCiphertext String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model DelayEvent {
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operator                String
+  originCrs               String
+  originName              String
+  destinationCrs          String
+  destinationName         String
+  serviceUid              String
+  runDate                 String
+  scheduledArrival        String
+  actualArrival           String
+  delayMinutes            Int
+  ticketType              String
+  ticketPricePence        Int
+  compensationTier        String
+  compensationAmountPence Int
+  claimSummary            String
+  status                  String    @default("unclaimed")
+  workflowRunId           String?
+  portalClaimRef          String?
+  submitError             String?
+  submittedAt             DateTime?
+  evidencePath            String?
+  evidenceMime            String?
+  tflJourneyId            String?
+  contactlessFarePence    Int?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
+  @@unique([userId, serviceUid, runDate])
+}
