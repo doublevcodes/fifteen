@@ -21,6 +21,9 @@ type ServiceSummary = {
   destinationCrs: string;
   destinationName: string;
   scheduledTime: string | null;
+  departureTime: string | null;
+  arrivalTime: string | null;
+  delayMinutes: number | null;
   atLocationCrs: string;
   atLocationName: string;
 };
@@ -260,7 +263,7 @@ export function ReportWizard() {
             </label>
             <label className="block text-sm">
               <span className="mono mb-1 block text-[10px] uppercase tracking-[0.16em] text-ink-muted">
-                From time
+                Depart after
               </span>
               <input
                 type="time"
@@ -300,44 +303,76 @@ export function ReportWizard() {
               No in-scope services found for that search.
             </p>
           ) : (
-            <div className="border border-bezel bg-bezel p-2.5 shadow-[var(--shadow)]">
-              <div className="overflow-hidden border border-line bg-paper">
-                <div className="grid w-full grid-cols-[4.75rem_minmax(0,1fr)_2.75rem_7rem] items-baseline gap-x-3 border-b border-line bg-paper-2 px-4 py-2 mono text-[9px] uppercase tracking-[0.18em] text-ink-muted sm:grid-cols-[5.5rem_minmax(0,1fr)_3.25rem_9rem] sm:gap-x-5 sm:px-6 sm:text-[10px]">
-                  <span>Time</span>
-                  <span>Destination</span>
-                  <span className="text-center">Op</span>
-                  <span className="text-right">Service</span>
+            <div className="space-y-3">
+              <p className="text-sm text-ink-muted">
+                Rows highlighted in amber arrived 15+ minutes late at your
+                destination — Delay Repay eligible.
+              </p>
+              <div className="border border-bezel bg-bezel p-2.5 shadow-[var(--shadow)]">
+                <div className="overflow-hidden border border-line bg-paper">
+                  <div className="grid w-full grid-cols-[4.25rem_4.25rem_minmax(0,1fr)_2.5rem_5.5rem] items-baseline gap-x-2 border-b border-line bg-paper-2 px-3 py-2 mono text-[9px] uppercase tracking-[0.18em] text-ink-muted sm:grid-cols-[5rem_5rem_minmax(0,1fr)_3.25rem_7rem] sm:gap-x-4 sm:px-5 sm:text-[10px]">
+                    <span>Dep{station ? ` ${station}` : ""}</span>
+                    <span>Arr{to ? ` ${to}` : ""}</span>
+                    <span>Destination</span>
+                    <span className="text-center">Op</span>
+                    <span className="text-right">Service</span>
+                  </div>
+                  <ul>
+                    {services.map((svc, i) => {
+                      const dep = svc.departureTime ?? svc.scheduledTime;
+                      const arr = svc.arrivalTime;
+                      const delay = svc.delayMinutes ?? 0;
+                      const eligible = delay >= 15;
+                      return (
+                        <li key={svc.uniqueIdentity}>
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => pickService(svc)}
+                            className={`grid w-full grid-cols-[4.25rem_4.25rem_minmax(0,1fr)_2.5rem_5.5rem] items-baseline gap-x-2 border-b border-line px-3 py-3 text-left transition hover:bg-paper-2 disabled:opacity-60 sm:grid-cols-[5rem_5rem_minmax(0,1fr)_3.25rem_7rem] sm:gap-x-4 sm:px-5 ${
+                              eligible
+                                ? "border-l-2 border-l-rail bg-rail/10 hover:bg-rail/15"
+                                : i % 2 === 1
+                                  ? "bg-[rgba(12,21,32,0.03)]"
+                                  : ""
+                            }`}
+                          >
+                            <span className="mono text-base tabular-nums text-ink sm:text-lg">
+                              {formatClock(dep)}
+                              <span className="mt-0.5 block text-[9px] uppercase tracking-[0.14em] text-ink-muted sm:text-[10px]">
+                                Dep
+                              </span>
+                            </span>
+                            <span className="mono text-base tabular-nums text-ink sm:text-lg">
+                              {formatClock(arr)}
+                              <span className="mt-0.5 block text-[9px] uppercase tracking-[0.14em] text-ink-muted sm:text-[10px]">
+                                Arr
+                              </span>
+                            </span>
+                            <span className="display min-w-0 truncate text-base font-semibold uppercase tracking-[0.04em] text-ink sm:text-lg">
+                              {svc.destinationName || svc.destinationCrs}
+                              <span className="mono mt-0.5 block truncate text-[10px] font-normal normal-case tracking-normal text-ink-muted">
+                                from {svc.originName || svc.originCrs}
+                                {eligible ? (
+                                  <span className="text-rail">
+                                    {" "}
+                                    · +{delay} min DR15
+                                  </span>
+                                ) : null}
+                              </span>
+                            </span>
+                            <span className="mono text-center text-[10px] uppercase text-ink-muted">
+                              {svc.operatorCode}
+                            </span>
+                            <span className="mono text-right text-[10px] text-ink-muted sm:text-xs">
+                              {svc.identity}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-                <ul>
-                  {services.map((svc, i) => (
-                    <li key={svc.uniqueIdentity}>
-                      <button
-                        type="button"
-                        disabled={loading}
-                        onClick={() => pickService(svc)}
-                        className={`grid w-full grid-cols-[4.75rem_minmax(0,1fr)_2.75rem_7rem] items-baseline gap-x-3 border-b border-line px-4 py-3 text-left transition hover:bg-paper-2 disabled:opacity-60 sm:grid-cols-[5.5rem_minmax(0,1fr)_3.25rem_9rem] sm:gap-x-5 sm:px-6 ${
-                          i % 2 === 1 ? "bg-[rgba(12,21,32,0.03)]" : ""
-                        }`}
-                      >
-                        <span className="mono text-base tabular-nums text-ink sm:text-lg">
-                          {formatClock(svc.scheduledTime)}
-                        </span>
-                        <span className="display min-w-0 truncate text-base font-semibold uppercase tracking-[0.04em] text-ink sm:text-lg">
-                          {svc.destinationName || svc.destinationCrs}
-                          <span className="mono mt-0.5 block truncate text-[10px] font-normal normal-case tracking-normal text-ink-muted">
-                            from {svc.originName || svc.originCrs}
-                          </span>
-                        </span>
-                        <span className="mono text-center text-[10px] uppercase text-ink-muted">
-                          {svc.operatorCode}
-                        </span>
-                        <span className="mono text-right text-[10px] text-ink-muted sm:text-xs">
-                          {svc.identity}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
               </div>
             </div>
           )}
@@ -364,7 +399,7 @@ export function ReportWizard() {
             <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-sm sm:grid-cols-4">
               <div>
                 <dt className="mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
-                  Scheduled
+                  Scheduled arrival
                 </dt>
                 <dd className="mono font-medium tabular-nums">
                   {formatClock(detail.scheduledArrival)}
@@ -372,7 +407,7 @@ export function ReportWizard() {
               </div>
               <div>
                 <dt className="mono text-[10px] uppercase tracking-[0.16em] text-ink-muted">
-                  Actual
+                  Actual arrival
                 </dt>
                 <dd className="mono font-medium tabular-nums">
                   {formatClock(detail.actualArrival)}

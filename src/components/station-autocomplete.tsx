@@ -67,16 +67,9 @@ export function StationAutocomplete({
 
   function onInputChange(value: string) {
     setQuery(value);
-    // Clear CRS until a suggestion is picked (or exact 3-letter CRS typed)
-    const trimmed = value.trim();
-    if (/^[A-Za-z]{3}$/.test(trimmed)) {
-      const byCrs = findStationByCrs(trimmed);
-      if (byCrs) {
-        onChange(byCrs.crsCode, byCrs);
-      } else {
-        onChange(trimmed.toUpperCase(), null);
-      }
-    } else if (crs) {
+    // Only commit a station when the user picks a suggestion — never
+    // auto-fill from a 3-letter CRS match (that hijacks typing).
+    if (crs) {
       onChange("", null);
     }
     updateSuggestions(value);

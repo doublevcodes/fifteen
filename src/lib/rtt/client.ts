@@ -19,7 +19,14 @@ export type ServiceSummary = {
   originName: string;
   destinationCrs: string;
   destinationName: string;
+  /** @deprecated Prefer departureTime — kept for board/compat */
   scheduledTime: string | null;
+  /** Scheduled departure from the searched (from) station */
+  departureTime: string | null;
+  /** Scheduled arrival at the destination (filterTo / train destination) */
+  arrivalTime: string | null;
+  /** Arrival lateness at destination in minutes, when known from location realtime */
+  delayMinutes: number | null;
   atLocationCrs: string;
   atLocationName: string;
 };
@@ -253,6 +260,9 @@ function mockServices(params: SearchParams): ServiceSummary[] {
   return operators.map((op, i) => {
     const hour = 8 + i;
     const identity = `M${op.code}${String(hour).padStart(2, "0")}00`;
+    const departureTime = `${params.date}T${String(hour).padStart(2, "0")}:15:00`;
+    const arrivalTime = `${params.date}T${String(hour + 1).padStart(2, "0")}:02:00`;
+    const delayMinutes = [27, 8, 34][i] ?? 0;
     return {
       uniqueIdentity: `gb-nr:${identity}:${params.date}`,
       identity,
@@ -264,7 +274,10 @@ function mockServices(params: SearchParams): ServiceSummary[] {
       originName: station,
       destinationCrs: dest,
       destinationName: dest,
-      scheduledTime: `${params.date}T${String(hour).padStart(2, "0")}:15:00`,
+      scheduledTime: departureTime,
+      departureTime,
+      arrivalTime,
+      delayMinutes,
       atLocationCrs: station,
       atLocationName: station,
     };
@@ -307,7 +320,7 @@ function mockServiceDetail(
   };
 }
 
-export type LocationServiceDetail = ServiceSummary & {
+export type LocationServiceDetail = Omit<ServiceSummary, "delayMinutes"> & {
   delayMinutes: number;
   platform: string | null;
   scheduledArrival: string | null;
@@ -321,31 +334,40 @@ export async function searchServices(
     return mockServices(params).filter((s) => s.operator != null);
   }
 
+  let services: ServiceSummary[] = [];
+
   if (hasNgToken()) {
     const data = await fetchNgLocation(params);
     if (!data?.services) return [];
 
-    return (data.services as Array<Record<string, unknown>>)
+    services = (data.services as Array<Record<string, unknown>>)
       .map((svc) => mapNgLocationService(svc, params.stationCrs))
+      .filter((s): s is ServiceSummary => s != null && s.operator != null);
+  } else {
+    const station = params.stationCrs.toUpperCase();
+    const [y, m, d] = params.date.split("-");
+    const time = (params.timeFrom ?? "0800").replace(":", "");
+    let path = `/json/search/${station}`;
+    if (params.filterToCrs) {
+      path += `/to/${params.filterToCrs.toUpperCase()}`;
+    }
+    path += `/${y}/${m}/${d}/${time}`;
+    if (params.arrivals) path += "/arrivals";
+
+    const data = await legacyFetch(path);
+    if (!data?.services) return [];
+
+    services = (data.services as Array<Record<string, unknown>>)
+      .map((svc) => mapLegacyLocationService(svc, params.date, station))
       .filter((s): s is ServiceSummary => s != null && s.operator != null);
   }
 
-  const station = params.stationCrs.toUpperCase();
-  const [y, m, d] = params.date.split("-");
-  const time = (params.timeFrom ?? "0800").replace(":", "");
-  let path = `/json/search/${station}`;
-  if (params.filterToCrs) {
-    path += `/to/${params.filterToCrs.toUpperCase()}`;
-  }
-  path += `/${y}/${m}/${d}/${time}`;
-  if (params.arrivals) path += "/arrivals";
+  const destCrs = params.filterToCrs?.toUpperCase();
+  if (!destCrs || services.length === 0) return services;
 
-  const data = await legacyFetch(path);
-  if (!data?.services) return [];
-
-  return (data.services as Array<Record<string, unknown>>)
-    .map((svc) => mapLegacyLocationService(svc, params.date, station))
-    .filter((s): s is ServiceSummary => s != null && s.operator != null);
+  // One extra location query at the destination (not N service fetches —
+  // RTT rate-limits ~30/min and parallel detail lookups wipe arrivals).
+  return mergeDestinationArrivals(services, params, destCrs);
 }
 
 /** Location lineup including arrival lateness + platform (for live boards). */
@@ -413,7 +435,8 @@ function mapNgLocationService(
     actualArrival: _aa,
     ...summary
   } = detailed;
-  return summary;
+  // Location delay is at the from station — destination lateness comes from merge.
+  return { ...summary, delayMinutes: null };
 }
 
 function mapNgLocationServiceDetailed(
@@ -448,7 +471,7 @@ function mapNgLocationServiceDetailed(
   const scheduledArrival = arrival?.scheduleAdvertised ?? null;
   const actualArrival =
     arrival?.realtimeActual ?? arrival?.realtimeForecast ?? null;
-  const scheduled =
+  const departureTime =
     departure?.scheduleAdvertised ?? arrival?.scheduleAdvertised ?? null;
 
   const delayMinutes =
@@ -477,7 +500,9 @@ function mapNgLocationServiceDetailed(
     originName: origin.name || stationCrs.toUpperCase(),
     destinationCrs: destination.crs,
     destinationName: destination.name,
-    scheduledTime: scheduled,
+    scheduledTime: departureTime,
+    departureTime,
+    arrivalTime: null,
     atLocationCrs: stationCrs.toUpperCase(),
     atLocationName: stationCrs.toUpperCase(),
     delayMinutes,
@@ -522,10 +547,10 @@ function mapLegacyLocationService(
     crs?: string;
   }>)?.[0];
 
-  const gbttBooked =
-    (loc.gbttBookedArrival as string | undefined) ??
-    (loc.gbttBookedDeparture as string | undefined) ??
-    null;
+  const gbttDeparture = loc.gbttBookedDeparture as string | undefined;
+  const gbttArrival = loc.gbttBookedArrival as string | undefined;
+  const departureTime =
+    parseHm(date, gbttDeparture) ?? parseHm(date, gbttArrival);
 
   return {
     uniqueIdentity: `legacy:${serviceUid}:${date}`,
@@ -538,10 +563,118 @@ function mapLegacyLocationService(
     originName: origin?.description ?? origin?.crs ?? "",
     destinationCrs: destination?.crs ?? "",
     destinationName: destination?.description ?? destination?.crs ?? "",
-    scheduledTime: parseHm(date, gbttBooked),
+    scheduledTime: departureTime,
+    departureTime,
+    arrivalTime: null,
+    delayMinutes: null,
     atLocationCrs: stationCrs,
     atLocationName: String(loc.description ?? stationCrs),
   };
+}
+
+/**
+ * Location search only returns times at the queried station. Pair the from
+ * departures with a second location query at the destination (filterFrom the
+ * origin) and merge scheduled arrival by uniqueIdentity — two requests total,
+ * instead of one detail fetch per service (which trips RTT rate limits).
+ */
+async function mergeDestinationArrivals(
+  services: ServiceSummary[],
+  params: SearchParams,
+  destCrs: string,
+): Promise<ServiceSummary[]> {
+  const arrivalByUid = new Map<
+    string,
+    { arrivalTime: string; delayMinutes: number | null }
+  >();
+
+  try {
+    if (hasNgToken()) {
+      // Arrivals land after departure — widen the window so late journeys still match.
+      const data = await fetchNgLocation({
+        stationCrs: destCrs,
+        filterFromCrs: params.stationCrs,
+        date: params.date,
+        timeFrom: params.timeFrom,
+        timeWindow: "240",
+        arrivals: true,
+      });
+      for (const raw of (data?.services ?? []) as Array<Record<string, unknown>>) {
+        const meta = (raw.scheduleMetadata ?? {}) as Record<string, unknown>;
+        const uid = String(meta.uniqueIdentity ?? "");
+        if (!uid) continue;
+        const temporal = (raw.temporalData ?? {}) as {
+          arrival?: {
+            scheduleAdvertised?: string;
+            realtimeAdvertisedLateness?: number;
+          };
+          departure?: {
+            scheduleAdvertised?: string;
+            realtimeAdvertisedLateness?: number;
+          };
+        };
+        const arrivalTime =
+          temporal.arrival?.scheduleAdvertised ??
+          temporal.departure?.scheduleAdvertised ??
+          null;
+        if (!arrivalTime) continue;
+        const delayMinutes =
+          typeof temporal.arrival?.realtimeAdvertisedLateness === "number"
+            ? Math.max(0, temporal.arrival.realtimeAdvertisedLateness)
+            : typeof temporal.departure?.realtimeAdvertisedLateness === "number"
+              ? Math.max(0, temporal.departure.realtimeAdvertisedLateness)
+              : null;
+        arrivalByUid.set(uid, { arrivalTime, delayMinutes });
+      }
+    } else {
+      const station = destCrs.toUpperCase();
+      const from = params.stationCrs.toUpperCase();
+      const [y, m, d] = params.date.split("-");
+      const time = (params.timeFrom ?? "0800").replace(":", "");
+      const path = `/json/search/${station}/from/${from}/${y}/${m}/${d}/${time}/arrivals`;
+      const data = await legacyFetch(path);
+      for (const container of (data?.services ?? []) as Array<
+        Record<string, unknown>
+      >) {
+        const loc = (container.locationDetail ?? container) as Record<
+          string,
+          unknown
+        >;
+        const service = (
+          container.serviceUid ? container : loc
+        ) as Record<string, unknown>;
+        const serviceUid = String(
+          service.serviceUid ?? loc.serviceUid ?? container.serviceUid ?? "",
+        );
+        const runDateRaw = String(
+          service.runDate ?? loc.runDate ?? container.runDate ?? params.date,
+        ).replaceAll("/", "-");
+        const date = runDateRaw.includes("-") ? runDateRaw : params.date;
+        if (!serviceUid) continue;
+        const uid = `legacy:${serviceUid}:${date}`;
+        const arrivalTime =
+          parseHm(date, loc.gbttBookedArrival as string | undefined) ??
+          parseHm(date, loc.gbttBookedDeparture as string | undefined);
+        if (!arrivalTime) continue;
+        const lateness = loc.realtimeArrivalLateness;
+        const delayMinutes =
+          typeof lateness === "number" ? Math.max(0, lateness) : null;
+        arrivalByUid.set(uid, { arrivalTime, delayMinutes });
+      }
+    }
+  } catch {
+    return services;
+  }
+
+  return services.map((svc) => {
+    const matched = arrivalByUid.get(svc.uniqueIdentity);
+    if (!matched) return svc;
+    return {
+      ...svc,
+      arrivalTime: matched.arrivalTime,
+      delayMinutes: matched.delayMinutes ?? svc.delayMinutes,
+    };
+  });
 }
 
 export async function getServiceDelay(

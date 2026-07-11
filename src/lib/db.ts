@@ -1,16 +1,45 @@
+import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  pgPool: Pool | undefined;
 };
 
-function createClient() {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is not set");
+/**
+ * Prefer session pooler (DIRECT_URL) locally — transaction pooler + Prisma
+ * prepared statements is flaky, and a stale Next process can keep a bad host.
+ * On Vercel / production, use DATABASE_URL (transaction pooler).
+ */
+function resolveConnectionString(): string {
+  const isProd =
+    process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
+  const url =
+    (!isProd && process.env.DIRECT_URL?.trim()) ||
+    process.env.DATABASE_URL?.trim();
+  if (!url) {
+    throw new Error(
+      isProd
+        ? "DATABASE_URL is not set"
+        : "DIRECT_URL or DATABASE_URL is not set",
+    );
   }
-  const adapter = new PrismaPg({ connectionString });
+  return url;
+}
+
+function createClient() {
+  const connectionString = resolveConnectionString();
+  const pool =
+    globalForPrisma.pgPool ??
+    new Pool({
+      connectionString,
+      // Supabase pooler presents a cert that Node may not trust by default.
+      ssl: { rejectUnauthorized: false },
+      max: 5,
+    });
+  globalForPrisma.pgPool = pool;
+  const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
 }
 
