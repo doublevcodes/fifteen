@@ -139,7 +139,14 @@ export async function attemptPayOut(
     return null;
   }
 
-  return payOutWithProfile(event, profile.mollieCustomerId);
+  return payOutWithProfile(
+    {
+      id: event.id,
+      compensationAmountPence: event.compensationAmountPence,
+      successFee: { id: event.successFee.id },
+    },
+    profile.mollieCustomerId,
+  );
 }
 
 /** Pay out every awaiting settlement for a user (e.g. right after bank connect). */
