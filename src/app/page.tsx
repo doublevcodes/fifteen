@@ -101,7 +101,7 @@ export default async function HomePage() {
               <div
                 className={`${COLS} border-b border-line bg-paper-2 px-3 py-1.5 mono text-[8px] uppercase tracking-[0.16em] text-ink-muted sm:px-4 sm:text-[9px]`}
               >
-                <span>Time</span>
+                <span>Dep</span>
                 <span>From</span>
                 <span className="truncate">To</span>
                 <span className="text-center">Plat</span>

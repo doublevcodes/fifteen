@@ -143,12 +143,12 @@ function shortStationName(name: string): string {
 
 const fetchCachedLiveBoard = unstable_cache(
   async (): Promise<BoardRow[]> => fetchLiveDelayedRows(),
-  ["delayed-network-board-v2"],
+  ["delayed-network-board-v3"],
   { revalidate: 90 },
 );
 
 /**
- * Recent DR15-eligible delayed arrivals across SWR / Southern / Southeastern hubs.
+ * Recent DR15-eligible delayed departures across SWR / Southern / Southeastern hubs.
  * Falls back to sample rows when RTT is unset or returns nothing.
  */
 export async function getDelayedTerminusBoard(): Promise<DelayedBoard> {
@@ -213,17 +213,18 @@ async function searchHubBatch(
             (s) =>
               s.operator != null &&
               s.delayMinutes >= MIN_DELAY &&
-              s.scheduledArrival != null,
+              s.departureTime != null,
           )
           .map((s) => ({
             key: `${s.uniqueIdentity}:${hub.crs}`,
-            time: isoToHm(s.scheduledArrival) ?? "——",
+            time: isoToHm(s.departureTime) ?? "——",
             from: shortStationName(s.originName || s.originCrs || "Unknown"),
             terminus: shortStationName(s.destinationName || hub.name),
             plat: s.platform ?? "—",
             delayMinutes: s.delayMinutes,
             status: `Delayed  +${s.delayMinutes}`,
-            sortAt: s.actualArrival ?? s.scheduledArrival ?? "",
+            sortAt:
+              s.actualArrival ?? s.departureTime ?? s.scheduledArrival ?? "",
             dedupeKey: s.uniqueIdentity,
           }));
       } catch {
